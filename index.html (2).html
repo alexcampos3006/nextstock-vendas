@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NexStockPro — Controle de Estoque por Voz para Farmácias de Manipulação</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --dark:       #060e1e;
+    --dark-mid:   #091528;
+    --card:       #0d1e38;
+    --card2:      #112240;
+    --border:     #1a3358;
+    --blue:       #1565c0;
+    --blue-light: #1e88e5;
+    --blue-bright:#42a5f5;
+    --orange:     #f57c00;
+    --orange-hi:  #ff9800;
+    --orange-glow:#ffb74d;
+    --white:      #e8f0fe;
+    --text:       #b0c4de;
+    --muted:      #5a7a9a;
+    --gold:       #fbbf24;
+    --red:        #f87171;
+    --radius:     13px;
+    --radius-lg:  22px;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+
+  body {
+    font-family:'DM Sans',sans-serif;
+    background:var(--dark);
+    color:var(--text);
+    font-size:16.5px;
+    line-height:1.7;
+    overflow-x:hidden;
+  }
+
+  h1,h2,h3,h4 { font-family:'Syne',sans-serif; line-height:1.15; }
+
+  /* grain */
+  body::before {
+    content:''; position:fixed; inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events:none; z-index:0; opacity:.5;
+  }
+
+  /* subtle grid */
+  body::after {
+    content:''; position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(21,101,192,0.15) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(21,101,192,0.15) 1px,transparent 1px);
+    background-size:64px 64px;
+    pointer-events:none; z-index:0; opacity:.4;
+    mask-image:radial-gradient(ellipse at 50% 0%,black 0%,transparent 65%);
+  }
+
+  .container { max-width:1080px; margin:0 auto; padding:0 24px; position:relative; z-index:1; }
+  .center { text-align:center; }
+
+  .tag {
+    display:inline-flex; align-items:center; gap:7px;
+    background:rgba(21,101,192,0.18);
+    border:1px solid rgba(30,136,229,0.35);
+    color:var(--blue-bright);
+    font-size:12px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
+    padding:5px 15px; border-radius:100px;
+  }
+  .tag::before { content:'●'; font-size:7px; }
+
+  .tag-orange {
+    display:inline-flex; align-items:center; gap:7px;
+    background:rgba(245,124,0,0.15);
+    border:1px solid rgba(255,152,0,0.4);
+    color:var(--orange-hi);
+    font-size:12px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
+    padding:5px 15px; border-radius:100px;
+  }
+  .tag-orange::before { content:'●'; font-size:7px; }
+
+  .section-title { font-size:clamp(1.9rem,4vw,2.8rem); font-weight:800; color:var(--white); }
+  .section-sub { color:var(--muted); font-size:1rem; max-width:580px; margin:0 auto; }
+
+  /* ── BUTTONS ── */
+  .btn-buy {
+    display:inline-flex; align-items:center; justify-content:center; gap:9px;
+    background:linear-gradient(135deg,var(--orange),var(--orange-hi));
+    color:#fff; font-family:'Syne',sans-serif;
+    font-weight:700; font-size:1rem; padding:15px 34px; border-radius:100px;
+    border:none; cursor:pointer; text-decoration:none;
+    box-shadow:0 4px 28px rgba(245,124,0,0.45),0 0 0 1px rgba(245,124,0,0.25);
+    transition:all .25s; position:relative; overflow:hidden;
+  }
+  .btn-buy::after { content:''; position:absolute; inset:0; background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,0.12)); }
+  .btn-buy:hover { transform:translateY(-3px); box-shadow:0 10px 40px rgba(245,124,0,0.6); }
+
+  .btn-wa {
+    display:inline-flex; align-items:center; justify-content:center; gap:9px;
+    background:transparent; color:var(--blue-bright);
+    font-family:'Syne',sans-serif; font-weight:600; font-size:1rem;
+    padding:14px 34px; border-radius:100px;
+    border:1.5px solid rgba(66,165,245,0.35);
+    text-decoration:none; transition:all .25s;
+  }
+  .btn-wa:hover { background:rgba(66,165,245,0.08); border-color:var(--blue-bright); transform:translateY(-2px); }
+  .btn-wa svg,.btn-buy svg { width:18px;height:18px;fill:currentColor;flex-shrink:0; }
+
+  /* ── NAV ── */
+  nav {
+    position:sticky; top:0; z-index:100;
+    background:rgba(6,14,30,0.85); backdrop-filter:blur(22px);
+    border-bottom:1px solid var(--border); padding:13px 0;
+  }
+  .nav-inner { display:flex; align-items:center; justify-content:space-between; gap:20px; }
+
+  /* ── LOGO ── */
+  .logo-wrap {
+    display:flex; align-items:center; gap:11px;
+    text-decoration:none;
+  }
+  .logo-icon {
+    width:40px; height:40px; border-radius:10px;
+    background:linear-gradient(135deg,var(--blue),var(--blue-light));
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 0 20px rgba(21,101,192,0.4);
+    flex-shrink:0;
+    position:relative; overflow:hidden;
+  }
+  .logo-icon::after {
+    content:'';
+    position:absolute; top:-8px; right:-8px;
+    width:20px; height:20px;
+    background:var(--orange);
+    border-radius:50%;
+    opacity:.7;
+  }
+  .logo-icon svg { width:22px; height:22px; fill:#fff; position:relative; z-index:1; }
+  .logo-text {
+    font-family:'Syne',sans-serif; font-weight:800; font-size:1.35rem; color:var(--white);
+  }
+  .logo-text span { color:var(--orange-hi); }
+
+  .nav-right { display:flex; align-items:center; gap:10px; }
+
+  /* ── HERO ── */
+  #hero { padding:90px 0 76px; position:relative; overflow:hidden; }
+  .hero-blob1 { position:absolute; width:700px; height:700px; background:radial-gradient(circle,rgba(21,101,192,0.2) 0%,rgba(21,101,192,0.05) 45%,transparent 70%); top:-220px; left:50%; transform:translateX(-50%); pointer-events:none; }
+  .hero-blob2 { position:absolute; width:300px; height:300px; background:radial-gradient(circle,rgba(245,124,0,0.12),transparent 70%); bottom:-40px; right:-60px; pointer-events:none; }
+
+  .hero-title { font-size:clamp(2.4rem,5.5vw,3.9rem); font-weight:800; color:var(--white); margin:22px auto 22px; max-width:820px; }
+  .hero-title em { font-style:normal; background:linear-gradient(100deg,var(--blue-bright),var(--orange-hi)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  .hero-sub { color:var(--muted); font-size:1.08rem; max-width:540px; margin:0 auto 38px; }
+  .hero-btns { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin-bottom:50px; }
+  .hero-stats { display:flex; flex-wrap:wrap; justify-content:center; gap:44px; border-top:1px solid var(--border); padding-top:40px; }
+  .stat-item { text-align:center; }
+  .stat-num { font-family:'Syne',sans-serif; font-size:2rem; font-weight:800; color:var(--white); display:block; }
+  .stat-num b { color:var(--orange-hi); }
+  .stat-label { color:var(--muted); font-size:0.84rem; }
+
+  /* ── VOICE HIGHLIGHT ── */
+  #voice {
+    padding:70px 0;
+    background:var(--dark-mid);
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+    position:relative; overflow:hidden;
+  }
+  #voice::before {
+    content:''; position:absolute; inset:0;
+    background:radial-gradient(ellipse at 50% 50%,rgba(245,124,0,0.07),transparent 65%);
+    pointer-events:none;
+  }
+  .voice-inner {
+    display:flex; align-items:center; gap:52px;
+  }
+  .voice-badge {
+    flex-shrink:0;
+    width:120px; height:120px;
+    background:linear-gradient(135deg,var(--orange),var(--orange-hi));
+    border-radius:30px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:3.5rem;
+    box-shadow:0 0 60px rgba(245,124,0,0.45), 0 0 120px rgba(245,124,0,0.15);
+    position:relative;
+  }
+  .voice-badge::after {
+    content:'';
+    position:absolute; inset:-3px;
+    border-radius:33px;
+    background:linear-gradient(135deg,var(--orange-hi),transparent,var(--orange));
+    z-index:-1; opacity:.5;
+  }
+  .voice-content { flex:1; }
+  .voice-content h2 { font-size:clamp(1.7rem,3.5vw,2.4rem); color:var(--white); margin-bottom:14px; }
+  .voice-content h2 span { color:var(--orange-hi); }
+  .voice-content p { color:var(--muted); margin-bottom:20px; font-size:1.02rem; }
+  .voice-pills { display:flex; flex-wrap:wrap; gap:10px; }
+  .vpill {
+    display:inline-flex; align-items:center; gap:7px;
+    background:rgba(245,124,0,0.1); border:1px solid rgba(255,152,0,0.3);
+    color:var(--orange-glow); font-size:0.88rem; font-weight:600;
+    padding:7px 16px; border-radius:100px;
+  }
+  .vpill::before { content:'🎙️'; font-size:0.8rem; }
+
+  /* ── PAIN ── */
+  #pain { padding:100px 0; }
+  .pain-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(278px,1fr)); gap:18px; margin-top:50px; }
+  .pain-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:26px; transition:border-color .3s; position:relative; overflow:hidden; }
+  .pain-card::before { content:''; position:absolute; top:0;left:0;right:0;height:2px; background:linear-gradient(90deg,transparent,rgba(248,113,113,0.5),transparent); }
+  .pain-card:hover { border-color:rgba(248,113,113,0.35); }
+  .pain-icon { font-size:1.8rem; margin-bottom:14px; display:block; }
+  .pain-card h3 { font-size:1rem; font-weight:700; color:var(--white); margin-bottom:8px; }
+  .pain-card p { color:var(--muted); font-size:0.9rem; }
+
+  /* ── SOLUTION ── */
+  #solution { padding:100px 0; background:var(--dark-mid); border-top:1px solid var(--border); border-bottom:1px solid var(--border); position:relative; overflow:hidden; }
+  #solution::before { content:''; position:absolute; width:500px;height:500px; background:radial-gradient(circle,rgba(21,101,192,0.07),transparent 70%); top:50%;right:-150px;transform:translateY(-50%); pointer-events:none; }
+  .solution-grid { display:grid; grid-template-columns:1fr 1fr; gap:56px; align-items:center; margin-top:56px; }
+  .solution-text p { color:var(--muted); margin-bottom:14px; }
+  .sol-features { display:flex;flex-direction:column;gap:12px;margin-top:28px; }
+  .feat-row { display:flex;align-items:flex-start;gap:14px; background:var(--card2); border:1px solid var(--border); border-radius:var(--radius); padding:15px 18px; transition:border-color .3s; }
+  .feat-row:hover { border-color:rgba(30,136,229,0.5); }
+  .feat-ico { width:36px;height:36px;flex-shrink:0; background:rgba(21,101,192,0.18); border:1px solid rgba(30,136,229,0.3); border-radius:9px; display:flex;align-items:center;justify-content:center; font-size:1rem; }
+  .feat-row h4 { font-size:0.92rem;color:var(--white);font-weight:600;margin-bottom:2px; }
+  .feat-row p { font-size:0.85rem;color:var(--muted); }
+  .feat-row.voice-feat { border-color:rgba(245,124,0,0.3); }
+  .feat-row.voice-feat .feat-ico { background:rgba(245,124,0,0.15); border-color:rgba(245,124,0,0.35); }
+  .feat-row.voice-feat:hover { border-color:var(--orange); }
+  .feat-row.voice-feat h4 { color:var(--orange-glow); }
+
+  /* MOCK */
+  .mock-screen { background:#030a14; border:1px solid var(--border); border-radius:16px; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(21,101,192,0.1),0 0 60px rgba(21,101,192,0.05); }
+  .mock-bar { background:var(--card2); padding:11px 16px; display:flex;align-items:center;gap:10px; border-bottom:1px solid var(--border); }
+  .mock-dots{display:flex;gap:5px;}
+  .mock-dots span{width:9px;height:9px;border-radius:50%;}
+  .mock-dots span:nth-child(1){background:#ff5f57;}
+  .mock-dots span:nth-child(2){background:#febc2e;}
+  .mock-dots span:nth-child(3){background:#28c840;}
+  .mock-title-bar{color:var(--muted);font-size:0.75rem;flex:1;text-align:center;font-family:'Syne',sans-serif;}
+  .mock-body{padding:18px;}
+  .mock-hr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+  .mock-hr h4{font-size:0.9rem;color:var(--white);font-family:'Syne',sans-serif;}
+  .mock-live{background:rgba(66,165,245,0.1);color:var(--blue-bright);font-size:0.68rem;font-weight:600;padding:3px 10px;border-radius:100px;border:1px solid rgba(66,165,245,0.25);}
+  .mock-voice-bar { background:rgba(245,124,0,0.1); border:1px solid rgba(245,124,0,0.25); border-radius:9px; padding:9px 14px; display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .mock-voice-bar span { font-size:0.75rem; color:var(--orange-glow); font-weight:500; }
+  .mock-voice-dot { width:8px;height:8px;background:var(--orange);border-radius:50%;animation:pulse 1.2s ease-in-out infinite; flex-shrink:0; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.4)} }
+  .mock-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+  .mkpi{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:10px;}
+  .mkpi-l{color:var(--muted);font-size:0.67rem;margin-bottom:3px;}
+  .mkpi-v{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:700;}
+  .mkpi-v.b{color:var(--blue-bright);}
+  .mkpi-v.o{color:var(--orange-hi);}
+  .mkpi-v.r{color:var(--red);}
+  .mock-tbl{width:100%;border-collapse:collapse;}
+  .mock-tbl th{color:var(--muted);font-size:0.68rem;font-weight:600;text-align:left;padding:5px 7px;border-bottom:1px solid var(--border);}
+  .mock-tbl td{color:var(--text);font-size:0.74rem;padding:7px 7px;border-bottom:1px solid rgba(26,51,88,0.5);}
+  .pill{display:inline-block;padding:2px 9px;border-radius:100px;font-size:0.67rem;font-weight:600;}
+  .pill.ok{background:rgba(66,165,245,0.1);color:var(--blue-bright);border:1px solid rgba(66,165,245,0.25);}
+  .pill.warn{background:rgba(251,191,36,0.1);color:var(--gold);border:1px solid rgba(251,191,36,0.25);}
+  .pill.danger{background:rgba(248,113,113,0.1);color:var(--red);border:1px solid rgba(248,113,113,0.25);}
+
+  /* ── BEFORE/AFTER ── */
+  #beforeafter{padding:100px 0;}
+  .ba-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:50px;}
+  .ba-card{border-radius:var(--radius-lg);padding:34px;position:relative;overflow:hidden;}
+  .ba-card.before{background:rgba(248,113,113,0.04);border:1px solid rgba(248,113,113,0.18);}
+  .ba-card.after{background:rgba(21,101,192,0.06);border:1px solid rgba(30,136,229,0.25);}
+  .ba-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+  .ba-card.before::before{background:linear-gradient(90deg,transparent,rgba(248,113,113,0.55),transparent);}
+  .ba-card.after::before{background:linear-gradient(90deg,transparent,var(--blue-light),var(--orange),var(--blue-light),transparent);}
+  .ba-label{font-family:'Syne',sans-serif;font-size:0.78rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:22px;display:flex;align-items:center;gap:8px;}
+  .ba-card.before .ba-label{color:var(--red);}
+  .ba-card.after .ba-label{color:var(--blue-bright);}
+  .ba-list{list-style:none;display:flex;flex-direction:column;gap:13px;}
+  .ba-list li{display:flex;align-items:flex-start;gap:11px;color:var(--muted);font-size:0.93rem;}
+  .ba-list li::before{content:'✕';flex-shrink:0;margin-top:2px;font-size:0.82rem;}
+  .ba-card.before .ba-list li::before{color:var(--red);}
+  .ba-card.after .ba-list li{color:var(--text);}
+  .ba-card.after .ba-list li::before{content:'✓';color:var(--orange-hi);}
+
+  /* ── BENEFITS ── */
+  #benefits{padding:100px 0;background:var(--dark-mid);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+  .benefits-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(218px,1fr));gap:18px;margin-top:50px;}
+  .benefit-card{background:var(--dark);border:1px solid var(--border);border-radius:var(--radius);padding:26px 22px;transition:all .3s;position:relative;overflow:hidden;}
+  .benefit-card:hover{border-color:rgba(30,136,229,0.5);transform:translateY(-4px);box-shadow:0 14px 36px rgba(21,101,192,0.1);}
+  .benefit-card::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at top left,rgba(21,101,192,0.08),transparent 60%);opacity:0;transition:opacity .3s;}
+  .benefit-card:hover::before{opacity:1;}
+  .benefit-card.voice-card { border-color:rgba(245,124,0,0.25); }
+  .benefit-card.voice-card:hover { border-color:var(--orange); box-shadow:0 14px 36px rgba(245,124,0,0.12); }
+  .benefit-card.voice-card::before { background:radial-gradient(circle at top left,rgba(245,124,0,0.08),transparent 60%); }
+  .benefit-icon{font-size:1.8rem;margin-bottom:14px;display:block;}
+  .benefit-card h3{font-size:0.97rem;color:var(--white);font-weight:700;margin-bottom:7px;}
+  .benefit-card p{color:var(--muted);font-size:0.86rem;}
+
+  /* ── HOW ── */
+  #how{padding:100px 0;}
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;margin-top:50px;position:relative;}
+  .steps::before{content:'';position:absolute;top:34px;left:12%;right:12%;height:1px;background:linear-gradient(90deg,transparent,var(--border),var(--border),transparent);}
+  .step{text-align:center;padding:0 16px;}
+  .step-num{width:68px;height:68px;background:linear-gradient(135deg,var(--blue),var(--blue-light));border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:#fff;margin:0 auto 18px;box-shadow:0 0 28px rgba(21,101,192,0.35);}
+  .step-num.orange-step { background:linear-gradient(135deg,var(--orange),var(--orange-hi)); box-shadow:0 0 28px rgba(245,124,0,0.35); }
+  .step h3{font-size:0.97rem;color:var(--white);font-weight:700;margin-bottom:9px;}
+  .step p{color:var(--muted);font-size:0.87rem;}
+
+  /* ── PROOF ── */
+  #proof{padding:100px 0;background:var(--dark-mid);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+  .testimonials{display:grid;grid-template-columns:repeat(auto-fit,minmax(295px,1fr));gap:18px;margin-top:50px;}
+  .testimonial{background:var(--dark);border:1px solid var(--border);border-radius:var(--radius);padding:26px;position:relative;}
+  .testimonial::before{content:'"';position:absolute;top:14px;right:18px;font-family:'Syne',sans-serif;font-size:5rem;font-weight:800;color:rgba(21,101,192,0.1);line-height:1;}
+  .stars{color:var(--gold);font-size:0.82rem;margin-bottom:13px;letter-spacing:2px;}
+  .testimonial p{color:var(--text);font-size:0.92rem;margin-bottom:18px;font-style:italic;}
+  .testi-author{display:flex;align-items:center;gap:11px;}
+  .avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--blue-light));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:0.9rem;flex-shrink:0;}
+  .author-info strong{display:block;font-size:0.87rem;color:var(--white);font-weight:600;}
+  .author-info span{font-size:0.8rem;color:var(--muted);}
+  .proof-numbers{display:flex;flex-wrap:wrap;justify-content:center;gap:48px;margin-top:56px;padding-top:50px;border-top:1px solid var(--border);}
+  .proof-num{text-align:center;}
+  .proof-num strong{display:block;font-family:'Syne',sans-serif;font-size:2.3rem;font-weight:800;background:linear-gradient(90deg,var(--blue-bright),var(--orange-hi));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+  .proof-num span{color:var(--muted);font-size:0.86rem;}
+
+  /* ── OBJECTIONS ── */
+  #objections{padding:100px 0;}
+  .obj-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:50px;}
+  .obj-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:26px;transition:border-color .3s;}
+  .obj-card:hover{border-color:rgba(30,136,229,0.4);}
+  .obj-q{color:var(--white);font-weight:700;font-size:0.97rem;margin-bottom:10px;display:flex;align-items:flex-start;gap:9px;}
+  .obj-q::before{content:'?';width:20px;height:20px;flex-shrink:0;background:rgba(245,124,0,0.12);color:var(--orange-hi);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.76rem;font-weight:800;margin-top:1px;}
+  .obj-a{color:var(--muted);font-size:0.9rem;}
+
+  /* ── FAQ ── */
+  #faq{padding:100px 0;background:var(--dark-mid);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+  .faq-list{max-width:700px;margin:50px auto 0;display:flex;flex-direction:column;gap:10px;}
+  .faq-item{background:var(--dark);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .faq-q{padding:19px 22px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:14px;color:var(--white);font-weight:600;font-size:0.95rem;transition:color .2s;user-select:none;}
+  .faq-q:hover{color:var(--blue-bright);}
+  .faq-arrow{width:22px;height:22px;flex-shrink:0;background:rgba(21,101,192,0.1);border:1px solid rgba(30,136,229,0.22);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:transform .3s,background .3s;font-size:0.72rem;color:var(--blue-bright);}
+  .faq-item.open .faq-arrow{transform:rotate(180deg);background:rgba(21,101,192,0.22);}
+  .faq-a{max-height:0;overflow:hidden;transition:max-height .35s ease,padding .35s;color:var(--muted);font-size:0.91rem;padding:0 22px;}
+  .faq-item.open .faq-a{max-height:200px;padding:0 22px 18px;}
+
+  /* ── GUARANTEE ── */
+  #guarantee{padding:80px 0;}
+  .guarantee-box{max-width:700px;margin:0 auto;background:linear-gradient(135deg,rgba(21,101,192,0.08),rgba(245,124,0,0.04));border:1.5px solid rgba(30,136,229,0.3);border-radius:var(--radius-lg);padding:50px 46px;text-align:center;position:relative;overflow:hidden;}
+  .guarantee-box::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(21,101,192,0.1),transparent 55%);pointer-events:none;}
+  .guarantee-seal{width:86px;height:86px;background:linear-gradient(135deg,var(--blue),var(--blue-light));border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 26px;font-size:2.4rem;box-shadow:0 0 48px rgba(21,101,192,0.4);}
+  .guarantee-box h2{font-size:1.75rem;color:var(--white);margin-bottom:14px;}
+  .guarantee-box p{color:var(--muted);max-width:480px;margin:0 auto;}
+
+  /* ── PRICING ── */
+  #pricing{padding:100px 0;background:var(--dark-mid);border-top:1px solid var(--border);}
+  .pricing-card{max-width:500px;margin:50px auto 0;background:linear-gradient(160deg,var(--card),var(--card2));border:1.5px solid rgba(245,124,0,0.4);border-radius:var(--radius-lg);padding:46px;text-align:center;position:relative;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,0.5),0 0 80px rgba(245,124,0,0.07);}
+  .pricing-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--blue-light),var(--orange-hi),var(--blue-light),transparent);}
+  .pricing-badge{background:linear-gradient(135deg,var(--orange),var(--orange-hi));color:#fff;font-family:'Syne',sans-serif;font-size:0.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 16px;border-radius:100px;display:inline-block;margin-bottom:22px;}
+  .pricing-old{color:var(--muted);text-decoration:line-through;font-size:0.97rem;margin-bottom:5px;}
+  .pricing-val{font-family:'Syne',sans-serif;font-weight:800;font-size:3.8rem;color:var(--white);line-height:1;margin-bottom:4px;}
+  .pricing-val sup{font-size:1.4rem;vertical-align:top;margin-top:8px;color:var(--orange-hi);}
+  .pricing-cycle{color:var(--muted);font-size:0.88rem;margin-bottom:30px;}
+  .pricing-includes{list-style:none;text-align:left;display:flex;flex-direction:column;gap:11px;margin-bottom:34px;padding:0 6px;}
+  .pricing-includes li{display:flex;align-items:center;gap:11px;color:var(--text);font-size:0.94rem;}
+  .pricing-includes li::before{content:'✓';color:var(--orange-hi);font-weight:700;flex-shrink:0;width:19px;height:19px;background:rgba(245,124,0,0.1);border:1px solid rgba(245,124,0,0.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.72rem;}
+  .pricing-includes li.voice-li { color:var(--orange-glow); font-weight:600; }
+  .pricing-note{color:var(--muted);font-size:0.83rem;margin-top:14px;}
+  .urgency-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.22);border-radius:100px;padding:7px 18px;color:var(--red);font-size:0.83rem;font-weight:600;margin-top:18px;}
+
+  /* ── CTA FINAL ── */
+  #cta-final{padding:120px 0;text-align:center;position:relative;overflow:hidden;}
+  #cta-final::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(21,101,192,0.12) 0%,transparent 55%);pointer-events:none;}
+  #cta-final::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 70% 60%,rgba(245,124,0,0.06) 0%,transparent 50%);pointer-events:none;}
+  #cta-final h2{font-size:clamp(1.9rem,4vw,3.1rem);color:var(--white);margin-bottom:18px;}
+  #cta-final p{color:var(--muted);font-size:1.03rem;max-width:480px;margin:0 auto 42px;}
+  #cta-final .btns{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;}
+
+  /* ── FOOTER ── */
+  footer{border-top:1px solid var(--border);padding:38px 0;text-align:center;color:var(--muted);font-size:0.83rem;}
+  footer a{color:var(--blue-bright);text-decoration:none;}
+
+  /* ── REVEAL ── */
+  .reveal{opacity:0;transform:translateY(28px);transition:opacity .6s ease,transform .6s ease;}
+  .reveal.visible{opacity:1;transform:translateY(0);}
+
+  @media(max-width:768px){
+    .solution-grid,.ba-grid,.obj-grid{grid-template-columns:1fr;}
+    .steps::before{display:none;}
+    .steps{gap:38px;}
+    .guarantee-box{padding:34px 22px;}
+    .pricing-card{padding:34px 22px;}
+    nav .btn-buy{display:none;}
+    .voice-inner{flex-direction:column;text-align:center;}
+    .voice-pills{justify-content:center;}
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="container nav-inner">
+    <a href="#" class="logo-wrap">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M3 3h18v4H3zM3 10h12v4H3zM3 17h8v4H3zM17 13l4 4-4 4v-3h-4v-2h4z"/></svg>
+      </div>
+      <div class="logo-text">Nex<span>Stock</span>Pro</div>
+    </a>
+    <div class="nav-right">
+      <a href="https://wa.me/5521960214770" target="_blank" class="btn-wa" style="padding:10px 20px;font-size:0.88rem;">
+        <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        WhatsApp
+      </a>
+      <a href="https://pay.kiwify.com.br/PNPVCPx" target="_blank" class="btn-buy" style="padding:10px 24px;font-size:0.88rem;">Comprar Agora</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-blob1"></div><div class="hero-blob2"></div>
+  <div class="container center">
+    <div class="reveal"><span class="tag">Exclusivo para Farmácias de Manipulação</span></div>
+    <h1 class="hero-title reveal">Controle Total do Estoque<br>com <em>Comando de Voz</em></h1>
+    <p class="hero-sub reveal">O NexStockPro é o único sistema de estoque para farmácias de manipulação que você opera com a voz. Mais rápido, mais simples, sem erro de digitação — e com tudo sob controle.</p>
+    <div class="hero-btns reveal">
+      <a href="https://pay.kiwify.com.br/PNPVCPx" target="_blank" class="btn-buy" style="font-size:1.05rem;padding:17px 38px;">
+        <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5.5L7 14h12l2-8H5.2z"/></svg>
+        Quero o NexStockPro Agora
+      </a>
+      <a href="https://wa.me/5521960214770" target="_blank" class="btn-wa" style="font-size:1.05rem;padding:16px 34px;">
+        <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Falar no WhatsApp
+      </a>
+    </div>
+    <div class="hero-stats reveal">
+      <div class="stat-item"><span class="stat-num">+<b>500</b></span><span class="stat-label">Farmácias ativas</span></div>
+      <div class="stat-item"><span class="stat-num"><b>38</b>%</span><span class="stat-label">Redução média de perdas</span></div>
+      <div class="stat-item"><span class="stat-num"><b>R$2.800</b></span><span class="stat-label">Economia média/mês</span></div>
+      <div class="stat-item"><span class="stat-num"><b>4,9</b>★</span><span class="stat-label">Avaliação dos clientes</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- VOICE HIGHLIGHT -->
+<section id="voice">
+  <div class="container">
+    <div class="voice-inner reveal">
+      <div class="voice-badge">🎙️</div>
+      <div class="voice-content">
+        <span class="tag-orange" style="margin-bottom:16px;display:inline-flex;">Diferencial Exclusivo</span>
+        <h2>O estoque que você controla<br><span>apenas com a sua voz</span></h2>
+        <p>Esqueça digitar em planilha enquanto manipula fórmulas. Com o NexStockPro, você fala e o sistema registra. Entrada de matéria-prima, saída, lote, validade — tudo por comando de voz, sem parar o que está fazendo. Isso acelera o processo e elimina erros de digitação.</p>
+        <div class="voice-pills">
+          <span class="vpill">"Entrar 500g de Vitamina C, lote 4821"</span>
+          <span class="vpill">"Baixar 200g de Lidocaína"</span>
+          <span class="vpill">"Ver estoque crítico"</span>
+          <span class="vpill">"Alertas de vencimento"</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PAIN -->
+<section id="pain">
+  <div class="container">
+    <div class="center reveal">
+      <span class="tag">O Problema Real</span>
+      <h2 class="section-title" style="margin:18px 0 11px">Você reconhece alguma<br>dessas situações?</h2>
+      <p class="section-sub">Sem um sistema dedicado, farmácias de manipulação perdem dinheiro todos os meses sem perceber.</p>
+    </div>
+    <div class="pain-grid">
+      <div class="pain-card reveal"><span class="pain-icon">😱</span><h3>Matérias-primas vencendo na prateleira</h3><p>Comprou demais ou percebeu tarde demais. Produto no lixo e dinheiro junto.</p></div>
+      <div class="pain-card reveal"><span class="pain-icon">📋</span><h3>Controle feito em planilha ou papel</h3><p>Dados desatualizados, erros de digitação, sem rastreabilidade. Tudo depende de memória.</p></div>
+      <div class="pain-card reveal"><span class="pain-icon">🔍</span><h3>Impossível rastrear lotes com segurança</h3><p>Quando uma auditoria chega, o desespero começa. Você não sabe de onde veio o quê.</p></div>
+      <div class="pain-card reveal"><span class="pain-icon">📦</span><h3>Falta de produto na hora errada</h3><p>Cliente chega e você não tem o insumo. Perda de venda, de confiança, de reputação.</p></div>
+      <div class="pain-card reveal"><span class="pain-icon">💸</span><h3>Compras feitas no chute</h3><p>Sem histórico confiável, você compra por intuição. Capital parado, estoque entulhado.</p></div>
+      <div class="pain-card reveal"><span class="pain-icon">⏱️</span><h3>Horas perdidas em registro manual</h3><p>Sua equipe para tudo para anotar. Tempo que poderia estar sendo usado na produção.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- SOLUTION -->
+<section id="solution">
+  <div class="container">
+    <div class="solution-grid">
+      <div class="solution-text reveal">
+        <span class="tag">A Solução</span>
+        <h2 class="section-title" style="margin:18px 0 14px">Apresentando o<br>NexStockPro</h2>
+        <p>O único sistema de controle de estoque criado do zero para a realidade das farmácias de manipulação — e o único que funciona por comando de voz. Lote, validade, entradas e saídas: você fala, o sistema registra.</p>
+        <p>Chega de planilha. Chega de susto com vencimento. Chega de parar a produção para digitar.</p>
+        <div class="sol-features">
+          <div class="feat-row voice-feat"><div class="feat-ico">🎙️</div><div><h4>Controle por Comando de Voz</h4><p>Registre entradas e saídas falando — sem largar o que está fazendo.</p></div></div>
+          <div class="feat-row"><div class="feat-ico">📥</div><div><h4>Entrada e Saída em Tempo Real</h4><p>Cada movimentação registrada com rastreabilidade completa.</p></div></div>
+          <div class="feat-row"><div class="feat-ico">⏰</div><div><h4>Alertas de Validade Automáticos</h4><p>Notificação antes do vencimento. Nunca mais produto no lixo.</p></div></div>
+          <div class="feat-row"><div class="feat-ico">🔢</div><div><h4>Controle de Lotes Completo</h4><p>Rastreabilidade por lote para total segurança operacional.</p></div></div>
+        </div>
+      </div>
+      <div class="reveal">
+        <div class="mock-screen">
+          <div class="mock-bar"><div class="mock-dots"><span></span><span></span><span></span></div><div class="mock-title-bar">NexStockPro — Dashboard</div></div>
+          <div class="mock-body">
+            <div class="mock-hr"><h4>Visão Geral do Estoque</h4><span class="mock-live">● Ao Vivo</span></div>
+            <div class="mock-voice-bar">
+              <div class="mock-voice-dot"></div>
+              <span>🎙️ "Entrar 300g de Silimarina, lote SE-2271, val. 12/2026"</span>
+            </div>
+            <div class="mock-kpis">
+              <div class="mkpi"><div class="mkpi-l">Itens em Estoque</div><div class="mkpi-v b">248</div></div>
+              <div class="mkpi"><div class="mkpi-l">Vencendo em 30d</div><div class="mkpi-v o">7</div></div>
+              <div class="mkpi"><div class="mkpi-l">Estoque Crítico</div><div class="mkpi-v r">3</div></div>
+            </div>
+            <table class="mock-tbl">
+              <thead><tr><th>Produto</th><th>Lote</th><th>Validade</th><th>Qtd</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Vitamina C Pura</td><td>LC-4821</td><td>12/2026</td><td>2,4 kg</td><td><span class="pill ok">Regular</span></td></tr>
+                <tr><td>Lidocaína Base</td><td>LB-0093</td><td>03/2025</td><td>450 g</td><td><span class="pill danger">Vencido!</span></td></tr>
+                <tr><td>Silimarina Ext.</td><td>SE-2271</td><td>12/2026</td><td>480 g</td><td><span class="pill ok">Regular</span></td></tr>
+                <tr><td>DMAE Bitartarato</td><td>DB-5512</td><td>09/2026</td><td>600 g</td><td><span class="pill ok">Regular</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BEFORE/AFTER -->
+<section id="beforeafter">
+  <div class="container">
+    <div class="center reveal">
+      <span class="tag">Transformação Real</span>
+      <h2 class="section-title" style="margin:18px 0 11px">Antes e Depois do NexStockPro</h2>
+      <p class="section-sub">A diferença real na operação de quem mudou para o controle inteligente.</p>
+    </div>
+    <div class="ba-grid reveal">
+      <div class="ba-card before">
+        <div class="ba-label">😰 Antes</div>
+        <ul class="ba-list">
+          <li>Planilhas desatualizadas e cheias de erros de digitação</li>
+          <li>Produtos vencendo sem ninguém perceber</li>
+          <li>Impossível rastrear lotes usados em cada fórmula</li>
+          <li>Compras no chute, capital parado em excesso de estoque</li>
+          <li>Parar a produção para registrar entradas e saídas</li>
+          <li>Medo constante de irregularidades no controle</li>
+          <li>Prejuízo invisível acumulando todo mês</li>
+        </ul>
+      </div>
+      <div class="ba-card after">
+        <div class="ba-label">🚀 Depois</div>
+        <ul class="ba-list">
+          <li>Estoque 100% atualizado em tempo real — por voz ou tela</li>
+          <li>Alertas automáticos antes de qualquer vencimento</li>
+          <li>Rastreabilidade de lote completa com um clique</li>
+          <li>Compras baseadas em dados reais de consumo e giro</li>
+          <li>Registro feito falando, sem parar a produção</li>
+          <li>Controle total e segurança em cada movimentação</li>
+          <li>Economia média de R$ 2.800 por mês em perdas evitadas</li>
+        </ul>
+      </div>
+    </div>
+    <div class="center" style="margin-top:42px">
+      <a href="https://pay.kiwify.com.br/PNPVCPx" target="_blank" class="btn-buy" style="font-size:1.03rem;padding:17px 38px;">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+        Quero Ter Esse Controle Agora
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- BENEFITS -->
+<section id="benefits">
+  <div class="container">
+    <div class="center reveal">
+      <span class="tag">Benefícios</span>
+      <h2 class="section-title" style="margin:18px 0 11px">Tudo o que você ganha<br>com o NexStockPro</h2>
+      <p class="section-sub">Uma transformação completa na forma como sua farmácia opera — do estoque ao lucro.</p>
+    </div>
+    <div class="benefits-grid">
+      <div class="benefit-card voice-card reveal"><span class="benefit-icon">🎙️</span><h3>Comando de Voz</h3><p>Registre qualquer movimentação falando. O mais rápido do mercado — mãos livres, sem parar.</p></div>
+      <div class="benefit-card reveal"><span class="benefit-icon">🎯</span><h3>Controle Total</h3><p>Visão completa e em tempo real de tudo que entra e sai da farmácia.</p></div>
+      <div class="benefit-card reveal"><span class="benefit-icon">🔔</span><h3>Zero Surpresas</h3><p>Alertas automáticos de vencimento e estoque mínimo — antes que vire problema.</p></div>
+      <div class="benefit-card reveal"><span class="benefit-icon">📉</span><h3>Menos Perdas</h3><p>Reduza em até 38% o desperdício de matérias-primas com gestão ativa.</p></div>
+      <div class="benefit-card reveal"><span class="benefit-icon">🔢</span><h3>Controle de Lotes</h3><p>Rastreabilidade por lote completa para total segurança em cada manipulação.</p></div>
+      <div class="benefit-card reveal"><span class="benefit-icon">⚡</span><h3>Fácil de Usar</h3><p>Interface que qualquer colaborador aprende em menos de 30 minutos.</p></div>
+      <div class="benefit-card reveal"><span class="benefit-icon">💰</span><h3>Mais Lucro</h3><p>Compre o que precisa, na hora certa. Menos desperdício, mais margem.</p></div>
+      <div class="benefit-card reveal"><span class="benefit-icon">📱</span><h3>Em Qualquer Lugar</h3><p>Celular, tablet ou computador. Acesse onde estiver.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="container">
+    <div class="center reveal">
+      <span class="tag">Simples Assim</span>
+      <h2 class="section-title" style="margin:18px 0 11px">Comece a controlar em<br>menos de 24 horas</h2>
+      <p class="section-sub">Sem TI, sem treinamento longo. Simples por design.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal"><div class="step-num">1</div><h3>Cadastre seus produtos</h3><p>Informe suas matérias-primas uma única vez. Rápido e intuitivo.</p></div>
+      <div class="step reveal"><div class="step-num orange-step">2</div><h3>Use a voz ou a tela</h3><p>Registre entradas e saídas falando ou clicando — como preferir.</p></div>
+      <div class="step reveal"><div class="step-num">3</div><h3>Receba alertas inteligentes</h3><p>O sistema avisa antes do vencimento e quando o estoque cai.</p></div>
+      <div class="step reveal"><div class="step-num orange-step">4</div><h3>Tome decisões com dados</h3><p>Veja o consumo real e faça compras certeiras, sem excessos.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PROOF -->
+<section id="proof">
+  <div class="container">
+    <div class="center reveal">
+      <span class="tag">O Que Nossos Clientes Dizem</span>
+      <h2 class="section-title" style="margin:18px 0 11px">Resultados reais de quem<br>já usa o NexStockPro</h2>
+    </div>
+    <div class="testimonials">
+      <div class="testimonial reveal"><div class="stars">★★★★★</div><p>"O comando de voz mudou tudo. Antes eu parava a manipulação para digitar. Hoje falo e o sistema registra. Economizei horas por semana e o estoque nunca mais saiu do controle."</p><div class="testi-author"><div class="avatar">MA</div><div class="author-info"><strong>Marina Albuquerque</strong><span>Farmacêutica · Farmácia Essência Viva, SP</span></div></div></div>
+      <div class="testimonial reveal"><div class="stars">★★★★★</div><p>"Antes perdia em média R$ 3.000 por mês em produtos vencidos. Nos últimos 4 meses com o NexStockPro esse número caiu para quase zero. Os alertas automáticos salvam minha farmácia todo mês."</p><div class="testi-author"><div class="avatar">RC</div><div class="author-info"><strong>Rafael Corrêa</strong><span>Proprietário · Farmácia Natura Viva, MG</span></div></div></div>
+      <div class="testimonial reveal"><div class="stars">★★★★★</div><p>"Minha equipe aprendeu em menos de uma hora. O mais incrível é o controle por voz — minha auxiliar registra saídas enquanto pesa os insumos. Produtividade absurda."</p><div class="testi-author"><div class="avatar">LF</div><div class="author-info"><strong>Luciana Fonseca</strong><span>Gestora · Farmácia Fórmula Certa, RS</span></div></div></div>
+    </div>
+    <div class="proof-numbers reveal">
+      <div class="proof-num"><strong>+500</strong><span>Farmácias ativas</span></div>
+      <div class="proof-num"><strong>38%</strong><span>Redução média de perdas</span></div>
+      <div class="proof-num"><strong>R$2.8k</strong><span>Economia mensal média</span></div>
+      <div class="proof-num"><strong>4,9★</strong><span>Satisfação dos clientes</span></div>
+    </div>
+    <div class="center" style="margin-top:46px">
+      <a href="https://wa.me/5521960214770" target="_blank" class="btn-wa" style="font-size:1.02rem;padding:15px 34px;">
+        <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Tirar dúvidas agora no WhatsApp
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- OBJECTIONS -->
+<section id="objections">
+  <div class="container">
+    <div class="center reveal">
+      <span class="tag">Respondendo Suas Dúvidas</span>
+      <h2 class="section-title" style="margin:18px 0 11px">Ainda na dúvida?<br>Entendemos você.</h2>
+      <p class="section-sub">Respondemos as principais preocupações com honestidade.</p>
+    </div>
+    <div class="obj-grid reveal">
+      <div class="obj-card"><div class="obj-q">O comando de voz funciona com barulho de fábrica?</div><div class="obj-a">Sim. O reconhecimento de voz foi otimizado para ambientes de farmácia de manipulação. Você pode falar em tom normal e o sistema interpreta corretamente, mesmo com ruído de fundo.</div></div>
+      <div class="obj-card"><div class="obj-q">Minha farmácia é pequena. Preciso mesmo?</div><div class="obj-a">Farmácias pequenas sofrem ainda mais com perdas porque cada real tem impacto maior. Nosso plano foi pensado justamente para quem precisa de controle sem complicação.</div></div>
+      <div class="obj-card"><div class="obj-q">Já uso planilha. Por que mudar agora?</div><div class="obj-a">Planilha não fala, não alerta, não rastreia lote automaticamente. Você gasta horas fazendo o que o NexStockPro faz em segundos — por voz.</div></div>
+      <div class="obj-card"><div class="obj-q">Minha equipe vai conseguir usar?</div><div class="obj-a">A interface foi desenhada para farmacêuticos e auxiliares, não para técnicos de TI. Aprendizado médio inferior a 30 minutos, com suporte incluso.</div></div>
+      <div class="obj-card"><div class="obj-q">E se eu não gostar depois de comprar?</div><div class="obj-a">30 dias de garantia incondicional. Se não ficar satisfeito, basta pedir reembolso. Sem perguntas, sem burocracia, sem pressão.</div></div>
+      <div class="obj-card"><div class="obj-q">Funciona no meu celular ou computador atual?</div><div class="obj-a">O NexStockPro roda no navegador de qualquer dispositivo com acesso à internet. Sem instalação, sem requisito de hardware especial.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="container">
+    <div class="center reveal">
+      <span class="tag">FAQ</span>
+      <h2 class="section-title" style="margin:18px 0 11px">Perguntas Frequentes</h2>
+    </div>
+    <div class="faq-list reveal">
+      <div class="faq-item"><div class="faq-q">O NexStockPro funciona sem internet?<div class="faq-arrow">▾</div></div><div class="faq-a">O sistema é baseado em nuvem e requer conexão com a internet para sincronizar dados. Funciona bem em redes de baixa velocidade. O modo offline está em desenvolvimento.</div></div>
+      <div class="faq-item"><div class="faq-q">O comando de voz funciona em qualquer idioma ou sotaque?<div class="faq-arrow">▾</div></div><div class="faq-a">Sim. O sistema foi treinado para o português brasileiro e funciona com diferentes sotaques regionais. Quanto mais você usa, mais ele se adapta à sua voz.</div></div>
+      <div class="faq-item"><div class="faq-q">Quantos usuários posso cadastrar?<div class="faq-arrow">▾</div></div><div class="faq-a">O plano padrão inclui até 5 usuários com perfis de acesso diferenciados. Planos com mais usuários estão disponíveis — fale pelo WhatsApp.</div></div>
+      <div class="faq-item"><div class="faq-q">Consigo visualizar o histórico completo de movimentações?<div class="faq-arrow">▾</div></div><div class="faq-a">Sim. Todo registro — seja por voz ou tela — fica salvo com data, hora, usuário e detalhes do produto. Você pode consultar e exportar o histórico completo.</div></div>
+      <div class="faq-item"><div class="faq-q">Como funciona o suporte técnico?<div class="faq-arrow">▾</div></div><div class="faq-a">Suporte humano por WhatsApp em horário comercial (seg–sex, 8h–18h), com especialistas em farmácias de manipulação.</div></div>
+      <div class="faq-item"><div class="faq-q">Posso cancelar quando quiser?<div class="faq-arrow">▾</div></div><div class="faq-a">Sim, sem multa e sem fidelidade mínima. Cancele pelo painel a qualquer momento. Mas a maioria dos clientes não volta atrás depois de experimentar.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- GUARANTEE -->
+<section id="guarantee">
+  <div class="container">
+    <div class="guarantee-box reveal">
+      <div class="guarantee-seal">🛡️</div>
+      <h2>Garantia Total de 30 Dias</h2>
+      <p>Experimente o NexStockPro por 30 dias com risco zero. Se por qualquer motivo você não ficar satisfeito, devolvemos 100% do investimento. Sem burocracia. Sem questionamentos. Nossa confiança no produto é total — e queremos que você também sinta isso.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="container">
+    <div class="center reveal">
+      <span class="tag-orange">Oferta Especial de Lançamento</span>
+      <h2 class="section-title" style="margin:18px 0 11px">Invista menos do que você<br>perde em perdas por mês</h2>
+      <p class="section-sub">A maioria das farmácias recupera o investimento no primeiro mês de uso.</p>
+    </div>
+    <div class="pricing-card reveal">
+      <div class="pricing-badge">🔥 Oferta de Lançamento</div>
+      <div class="pricing-old">De R$ 197/mês</div>
+      <div class="pricing-val"><sup>R$</sup>99</div>
+      <div class="pricing-cycle">/mês · Cancele quando quiser</div>
+      <ul class="pricing-includes">
+        <li class="voice-li">🎙️ Controle por Comando de Voz incluso</li>
+        <li>Controle ilimitado de produtos e matérias-primas</li>
+        <li>Gestão de lotes e validades com alertas automáticos</li>
+        <li>Registro de entradas e saídas em tempo real</li>
+        <li>Dashboard com indicadores de desempenho</li>
+        <li>Histórico completo exportável de movimentações</li>
+        <li>Até 5 usuários com perfis de acesso</li>
+        <li>Suporte humano por WhatsApp</li>
+        <li>Atualizações gratuitas sempre</li>
+        <li>Garantia de 30 dias sem risco</li>
+      </ul>
+      <a href="https://pay.kiwify.com.br/PNPVCPx" target="_blank" class="btn-buy" style="width:100%;font-size:1.05rem;padding:17px;">
+        <svg viewBox="0 0 24 24" style="fill:#fff"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5.5L7 14h12l2-8H5.2z"/></svg>
+        Comprar Agora por R$ 99/mês
+      </a>
+      <div class="pricing-note">💳 Cartão, boleto ou Pix · Sem contrato de fidelidade</div>
+      <div class="urgency-tag">🔥 Oferta válida apenas para as próximas 48 horas</div>
+    </div>
+    <div class="center" style="margin-top:26px">
+      <a href="https://wa.me/5521960214770?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20NexStockPro%20antes%20de%20comprar." target="_blank" class="btn-wa">
+        <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Prefiro falar no WhatsApp antes — (21) 96021-4770
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section id="cta-final">
+  <div class="container">
+    <span class="tag-orange" style="margin-bottom:26px;display:inline-flex;">Última chance de mudar o jogo</span>
+    <h2 class="reveal">Sua farmácia merece<br>o controle que ela não tem.</h2>
+    <p class="reveal">Cada dia sem o NexStockPro é um dia com perdas evitáveis. Fale, registre, controle — e lucre mais.</p>
+    <div class="btns reveal">
+      <a href="https://pay.kiwify.com.br/PNPVCPx" target="_blank" class="btn-buy" style="font-size:1.05rem;padding:17px 40px;">
+        <svg viewBox="0 0 24 24" style="fill:#fff"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5.5L7 14h12l2-8H5.2z"/></svg>
+        Comprar Agora — R$ 99/mês
+      </a>
+      <a href="https://wa.me/5521960214770" target="_blank" class="btn-wa" style="font-size:1.05rem;padding:16px 34px;">
+        <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Falar no WhatsApp
+      </a>
+    </div>
+    <p style="color:var(--muted);font-size:0.83rem;margin-top:22px;">🛡️ Garantia de 30 dias · Sem fidelidade · Cancele quando quiser</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <a href="#" class="logo-wrap" style="justify-content:center;margin-bottom:14px;display:inline-flex;">
+      <div class="logo-icon" style="width:30px;height:30px;border-radius:8px;">
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#fff"><path d="M3 3h18v4H3zM3 10h12v4H3zM3 17h8v4H3zM17 13l4 4-4 4v-3h-4v-2h4z"/></svg>
+      </div>
+      <div class="logo-text" style="font-size:1.05rem;">Nex<span>Stock</span>Pro</div>
+    </a>
+    <p style="margin-bottom:10px">Sistema de Controle de Estoque por Voz para Farmácias de Manipulação</p>
+    <p>
+      <a href="https://wa.me/5521960214770" target="_blank">WhatsApp: (21) 96021-4770</a> ·
+      <a href="#">Política de Privacidade</a> ·
+      <a href="#">Termos de Uso</a>
+    </p>
+    <p style="margin-top:14px;opacity:.4;font-size:0.78rem">© 2025 NexStockPro. Todos os direitos reservados.</p>
+  </div>
+</footer>
+
+<script>
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('visible'); obs.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+  document.querySelectorAll('.faq-q').forEach(q => {
+    q.addEventListener('click', () => {
+      const item = q.parentElement;
+      const wasOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+      if (!wasOpen) item.classList.add('open');
+    });
+  });
+</script>
+</body>
+</html>
