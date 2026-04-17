@@ -1,0 +1,1 @@
+# nextstock-vendas
